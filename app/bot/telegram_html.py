@@ -54,9 +54,24 @@ class _Sanitizer(HTMLParser):
         return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
+_MD_BOLD = re.compile(r"\*\*(?=\S)(.+?)(?<=\S)\*\*")
+_MD_ITALIC = re.compile(r"(?<![\w*])\*(?=[^\s*])([^*\n]+?)(?<=\S)\*(?![\w*])")
+_MD_LINK = re.compile(r"\[([^\]\n]+)\]\((https?://[^)\s]+)\)")
+_MD_HEADING = re.compile(r"^#{1,3}\s+(.+)$", re.MULTILINE)
+
+
+def markdown_to_html(text: str) -> str:
+    """Модели часто отвечают Markdown вместо HTML: переводим жирный, курсив, ссылки."""
+    text = _MD_HEADING.sub(r"<b>\1</b>", text)
+    text = _MD_LINK.sub(r'<a href="\2">\1</a>', text)
+    text = _MD_BOLD.sub(r"<b>\1</b>", text)
+    text = _MD_ITALIC.sub(r"<i>\1</i>", text)
+    return text
+
+
 def sanitize(html: str) -> str:
     p = _Sanitizer()
-    p.feed(html)
+    p.feed(markdown_to_html(html))
     p.close()
     return p.result()
 

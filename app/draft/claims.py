@@ -54,7 +54,8 @@ def match_score(quote: str, source: str) -> float:
 def check_claims(claims: list[Claim], source_text: str, threshold: float) -> list[ClaimCheck]:
     out = []
     for c in claims:
-        score = match_score(c.quote, source_text)
+        # Модели иногда меняют поля местами: цитата в text, пересказ в quote. Берём лучшее.
+        score = max(match_score(c.quote, source_text), match_score(c.text, source_text))
         out.append(
             ClaimCheck(
                 text=c.text, quote=c.quote, score=round(score, 3), confirmed=score >= threshold

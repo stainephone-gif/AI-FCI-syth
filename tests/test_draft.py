@@ -235,3 +235,24 @@ def test_draft_prompt_bundles_styleguide() -> None:
     text = draft_system_prompt(ROOT / "prompts")
     assert "черновик поста" in text and "# Стайлгайд канала" in text
     assert "Что это значит для медийщика" in text
+
+
+def test_markdown_from_model_becomes_telegram_html() -> None:
+    from app.bot.telegram_html import markdown_to_html
+
+    raw = (
+        "**Заголовок**\n\n*Курсив с запятой, да.*\n\n💜 5*3 не курсив\n\n[Источник](https://a.b/c)"
+    )
+    out = sanitize(raw)
+    assert out.startswith("<b>Заголовок</b>")
+    assert "<i>Курсив с запятой, да.</i>" in out
+    assert "5*3" in out
+    assert '<a href="https://a.b/c">Источник</a>' in out
+    assert markdown_to_html("## Заголовок") == "<b>Заголовок</b>"
+    # настоящий HTML проходит без изменений
+    assert sanitize("<b>x</b> и <i>y</i>") == "<b>x</b> и <i>y</i>"
+
+
+def test_claim_check_accepts_swapped_fields() -> None:
+    swapped = [Claim(text="40% fewer factual errors", quote="Ошибок меньше на 40%")]
+    assert check_claims(swapped, SOURCE, 0.85)[0].confirmed
