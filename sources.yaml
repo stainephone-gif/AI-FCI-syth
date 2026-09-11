@@ -2,9 +2,10 @@
 # и по команде /collect. Поле note уходит в промпт ранжирования: зачем источник каналу.
 sources:
   - name: Anthropic News
-    kind: rss
-    url: https://www.anthropic.com/rss.xml
-    note: Релизы моделей и исследования; проверять версии моделей по тексту.
+    kind: html
+    url: https://www.anthropic.com/news
+    enabled: false
+    note: Официального RSS нет (rss.xml отдаёт 404). Парсер страницы появится в v1.
   - name: OpenAI Blog
     kind: rss
     url: https://openai.com/news/rss.xml

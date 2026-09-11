@@ -55,7 +55,8 @@ async def fetch_full_text(client: httpx.AsyncClient, url: str) -> str | None:
         r = await client.get(url, headers={"User-Agent": USER_AGENT}, follow_redirects=True)
         r.raise_for_status()
     except httpx.HTTPError as exc:
-        log.info("Полный текст не скачан %s: %s", url, exc)
+        # Многие сайты закрыты для ботов (403): тогда берём описание из ленты, это штатно.
+        log.debug("Полный текст не скачан %s: %s", url, exc)
         return None
     text = trafilatura.extract(r.text, include_comments=False, include_tables=False)
     return text[:MAX_TEXT_CHARS] if text else None

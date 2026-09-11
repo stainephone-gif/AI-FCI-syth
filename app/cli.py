@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 from html import unescape
+from pathlib import Path
 
 from sqlalchemy import func, select
 
@@ -103,6 +104,7 @@ async def cmd_card(settings: Settings, title: str, subtitle: str) -> None:
 
 async def cmd_models(settings: Settings) -> None:
     """Проверка ключа: список моделей провайдера."""
+    print(f"Провайдер из .env: {settings.model_provider}")
     names = await list_models(settings)
     print(f"Провайдер {settings.model_provider}, доступно моделей: {len(names)}")
     for n in names:
@@ -140,6 +142,11 @@ def main(argv: list[str] | None = None) -> None:
     c.add_argument("subtitle", nargs="?", default="")
     args = p.parse_args(argv)
 
+    if not Path(".env").exists():
+        print(
+            "Файл .env не найден в текущей папке. Создайте его: copy .env.example .env, "
+            "затем notepad .env. Проверьте, что файл не называется .env.txt."
+        )
     settings = Settings()  # type: ignore[call-arg]
     setup_logging(settings.log_level)
     match args.cmd:

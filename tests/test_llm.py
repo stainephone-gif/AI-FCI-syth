@@ -33,8 +33,8 @@ async def test_structured_call_retries_with_error_feedback() -> None:
     result = await structured_call(chat, "system", "user", Tiny, retries=2)
     assert result == Tiny(score=7, note="ок")
     assert len(seen) == 2
-    assert seen[0][0]["role"] == "system" and "Схема:" in seen[0][0]["content"]
-    assert seen[1][-1]["role"] == "user" and "не соответствует схеме" in seen[1][-1]["content"]
+    assert seen[0][0]["role"] == "system" and "Шаблон:" in seen[0][0]["content"]
+    assert seen[1][-1]["role"] == "user" and "не соответствует формату" in seen[1][-1]["content"]
 
 
 async def test_structured_call_gives_up() -> None:
@@ -66,3 +66,54 @@ def test_gigachat_provider_requires_credentials(monkeypatch) -> None:
     s = Settings(_env_file=None, model_provider="gigachat", gigachat_credentials="abc")
     rank_fn, write_fn = build_model_functions(s)
     assert callable(rank_fn) and callable(write_fn)
+
+
+def test_template_and_notes_for_rank_schema() -> None:
+    from app.llm.structured import field_notes, template_from_model
+    from app.rank.schemas import RankResult
+
+    t = template_from_model(RankResult)
+    assert t == {
+        "relevance": 0,
+        "audience_angle": "...",
+        "topic": "models",
+        "needs_fact_check": False,
+        "reason": "...",
+    }
+    notes = field_notes(RankResult)
+    assert "topic (одно из: 'models'" in notes and "needs_fact_check (bool)" in notes
+
+
+def test_template_for_nested_post_schema() -> None:
+    from app.draft.schemas import PostDraft
+    from app.llm.structured import template_from_model
+
+    t = template_from_model(PostDraft)
+    assert t["claims"] == [{"text": "...", "quote": "..."}]
+    assert t["card"] == {"title": "...", "subtitle": "..."}
+    assert t["dates"] == ["..."] and t["confidence_notes"] == ["..."]
+
+
+async def test_schema_echo_gets_specific_feedback() -> None:
+    from app.rank.schemas import RankResult
+
+    replies = iter(
+        [
+            '{"properties": {"relevance": {"type": "integer"}}}',
+            '{"relevance": 80, "audience_angle": "a", "topic": "media", '
+            '"needs_fact_check": false, "reason": "r"}',
+        ]
+    )
+    seen = []
+
+    async def chat(messages):
+        seen.append(list(messages))
+        return next(replies)
+
+    r = await structured_call(chat, "s", "u", RankResult)
+    assert r.relevance == 80
+    assert "вернул описание схемы" in seen[1][-1]["content"]
+    assert (
+        "Шаблон:" in seen[0][0]["content"]
+        and "Не возвращай описание схемы" in seen[0][0]["content"]
+    )

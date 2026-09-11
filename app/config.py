@@ -12,7 +12,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    bot_token: str
+    bot_token: str = ""  # нужен только полному режиму с Telegram
 
     # Провайдер моделей: anthropic | gigachat | openai (любой OpenAI-совместимый API)
     model_provider: str = "anthropic"
@@ -111,6 +111,8 @@ def setup_logging(level: str) -> None:
     )
     # Токен бота попадает в URL запросов aiogram; на DEBUG его лучше не светить.
     logging.getLogger("aiogram.event").setLevel(logging.INFO)
+    # Строка на каждый HTTP-запрос только мешает читать отчёт.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def load_settings() -> Settings:

@@ -18,7 +18,10 @@ def build_model_functions(settings: Settings) -> tuple[RankFn, WriteFn]:
         from app.rank.ranker import make_claude_ranker
 
         if not settings.anthropic_api_key:
-            raise SystemExit("ANTHROPIC_API_KEY пуст: заполните .env")
+            raise SystemExit(
+                "MODEL_PROVIDER=anthropic, но ANTHROPIC_API_KEY пуст. Для GigaChat добавьте в .env "
+                "строку MODEL_PROVIDER=gigachat и GIGACHAT_CREDENTIALS=..."
+            )
         client = AsyncAnthropic(api_key=settings.anthropic_api_key)
         return (
             make_claude_ranker(client, settings.rank_model_name),
@@ -42,6 +45,11 @@ async def list_models(settings: Settings) -> list[str]:
     if provider == "anthropic":
         from anthropic import AsyncAnthropic
 
+        if not settings.anthropic_api_key:
+            raise SystemExit(
+                "MODEL_PROVIDER=anthropic, но ANTHROPIC_API_KEY пуст. Для GigaChat добавьте в .env "
+                "строку MODEL_PROVIDER=gigachat и GIGACHAT_CREDENTIALS=..."
+            )
         client = AsyncAnthropic(api_key=settings.anthropic_api_key)
         return [m.id async for m in client.models.list()]
     if provider == "gigachat":
