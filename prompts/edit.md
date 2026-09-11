@@ -10,6 +10,7 @@
   которого в источнике нет, не выдумывай: оставь место в тексте и опиши
   проблему в confidence_notes.
 - claims перечисли заново для новой версии целиком, с цитатами из источника.
+- Разметка только HTML-тегами Telegram (b, i, a, blockquote), Markdown запрещён.
 - Структура и поля ответа те же, что у черновика: headline, body,
   media_takeaway, source_url, claims, card, confidence_notes.
 
