@@ -48,6 +48,18 @@ async def cmd_help(message: Message) -> None:
     await message.answer(HELP)
 
 
+@router.message(Command("whoami"))
+async def cmd_whoami(message: Message, settings: Settings) -> None:
+    """Доступна всем: нужна один раз, чтобы заполнить EDITOR_IDS и EDITOR_CHAT_ID."""
+    uid = message.from_user.id if message.from_user else None
+    role = "редактор" if settings.is_editor(uid) else "не в списке редакторов"
+    await message.reply(
+        f"Ваш id: <code>{uid}</code> ({role})\n"
+        f"Id этого чата: <code>{message.chat.id}</code>\n"
+        "Скопируйте эти числа в .env: EDITOR_IDS и EDITOR_CHAT_ID."
+    )
+
+
 @router.message(Command("status"))
 async def cmd_status(
     message: Message, settings: Settings, db: Database, scheduler: Scheduler

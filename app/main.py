@@ -79,7 +79,10 @@ async def run() -> None:
     settings = load_settings()
     setup_logging(settings.log_level)
     if not settings.editor_ids:
-        raise SystemExit("EDITOR_IDS пуст: бот не будет отвечать никому. Заполните .env.")
+        log.warning(
+            "EDITOR_IDS пуст: режим настройки, бот отвечает только на /whoami. "
+            "Заполните .env и перезапустите."
+        )
 
     db = Database(settings.database_url)
     await db.create_all()

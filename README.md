@@ -5,6 +5,7 @@
 с обязательным одобрением редактора.
 
 Архитектура и план запуска: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Тестовая неделя по шагам: [docs/TEST-WEEK.md](docs/TEST-WEEK.md).
 
 ## Локальный запуск
 
