@@ -13,7 +13,16 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     bot_token: str
+
+    # Провайдер моделей: anthropic | gigachat | openai (любой OpenAI-совместимый API)
+    model_provider: str = "anthropic"
     anthropic_api_key: str = ""
+    gigachat_credentials: str = ""  # Authorization key из личного кабинета Sber
+    gigachat_scope: str = "GIGACHAT_API_PERS"  # _PERS физлицо, _B2B / _CORP организация
+    gigachat_verify_ssl: bool = False  # True, если установлен корневой сертификат Минцифры
+    gigachat_ca_bundle: str = ""
+    openai_base_url: str = ""
+    openai_api_key: str = ""
 
     # Кто имеет право нажимать кнопки и писать боту. Все остальные игнорируются.
     editor_ids: Annotated[frozenset[int], NoDecode] = Field(default=frozenset())
@@ -32,13 +41,13 @@ class Settings(BaseSettings):
     # Сбор и ранжирование
     freshness_hours: int = 72  # кандидаты старше окна не берём
     fetch_full_text: bool = True  # добирать полный текст статьи по ссылке
-    rank_model: str = "claude-haiku-4-5"
+    rank_model: str = ""  # пусто: значение по умолчанию для провайдера
     rank_concurrency: int = 4  # параллельных запросов к модели
     rank_min_relevance: int = 60  # ниже порога кандидат остаётся в базе, но не идёт дальше
     digest_top_n: int = 3  # сколько черновиков показывать редактору
 
     # Черновики
-    draft_model: str = "claude-opus-5"
+    draft_model: str = ""  # пусто: значение по умолчанию для провайдера
     draft_effort: str = "medium"  # low | medium | high
     draft_concurrency: int = 2
     claim_match_threshold: float = 0.85  # нечёткое совпадение цитаты с источником
@@ -69,6 +78,26 @@ class Settings(BaseSettings):
 
     def is_editor(self, user_id: int | None) -> bool:
         return user_id is not None and user_id in self.editor_ids
+
+    _DEFAULT_MODELS = {
+        "anthropic": ("claude-haiku-4-5", "claude-opus-5"),
+        "gigachat": ("GigaChat-2", "GigaChat-2-Max"),
+        "openai": ("", ""),
+    }
+
+    @property
+    def rank_model_name(self) -> str:
+        name = self.rank_model or self._DEFAULT_MODELS.get(self.model_provider, ("", ""))[0]
+        if not name:
+            raise SystemExit("RANK_MODEL пуст: для этого провайдера имя модели нужно задать")
+        return name
+
+    @property
+    def draft_model_name(self) -> str:
+        name = self.draft_model or self._DEFAULT_MODELS.get(self.model_provider, ("", ""))[1]
+        if not name:
+            raise SystemExit("DRAFT_MODEL пуст: для этого провайдера имя модели нужно задать")
+        return name
 
     @property
     def slots(self) -> list[str]:

@@ -84,7 +84,7 @@ async def _store_draft(
             item_id=post.item_id,
             version=(last or 0) + 1,
             post_json=payload,
-            model=settings.draft_model,
+            model=settings.draft_model_name,
             prompt_version=PROMPT_VERSION,
         )
         s.add(draft)

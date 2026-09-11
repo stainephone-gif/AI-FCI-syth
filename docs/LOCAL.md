@@ -46,12 +46,16 @@ copy .env.example .env
 
 ## 3. Заполнить `.env`
 
-Открыть файл `.env` в любом текстовом редакторе. Для консольного режима
-достаточно одной строки:
+Открыть файл `.env` в любом текстовом редакторе и выбрать провайдера моделей:
 
 ```
-ANTHROPIC_API_KEY=sk-ant-...
+MODEL_PROVIDER=gigachat            # или anthropic, или openai
+GIGACHAT_CREDENTIALS=...           # для gigachat
+ANTHROPIC_API_KEY=...              # для anthropic
+OPENAI_BASE_URL=... OPENAI_API_KEY=... RANK_MODEL=... DRAFT_MODEL=...   # для openai: Qwen, Kimi, OpenRouter
 ```
+
+Проверка ключа: `python -m app.cli models` печатает доступные модели.
 
 `BOT_TOKEN` для консольного режима можно оставить как в примере. База
 создастся сама в `data/syth.db`.

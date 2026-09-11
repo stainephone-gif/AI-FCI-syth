@@ -17,6 +17,10 @@ make run                   # бот и планировщик в одном пр
 make test                  # тесты
 ```
 
+Провайдер моделей выбирается в `.env`: `MODEL_PROVIDER=anthropic|gigachat|openai`,
+последний покрывает любой OpenAI-совместимый API (Qwen, Kimi, OpenRouter).
+Проверка ключа: `python -m app.cli models`.
+
 Отладка без Telegram, нужен только ключ API:
 
 ```bash
