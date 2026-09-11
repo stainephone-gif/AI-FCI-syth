@@ -19,6 +19,7 @@ from app.bot.telegram_html import sanitize
 from app.cards.render import CardData, render_png
 from app.config import Settings
 from app.db import Database, Draft, Event, Item, Post, PostStatus
+from app.db.models import SourceKind
 from app.draft.claims import check_claims
 from app.draft.prompt import (
     PROMPT_VERSION,
@@ -26,6 +27,8 @@ from app.draft.prompt import (
     draft_user_prompt,
     edit_system_prompt,
     edit_user_prompt,
+    manual_system_prompt,
+    manual_user_prompt,
 )
 from app.draft.schemas import PostDraft
 from app.draft.writer import WriteFn
@@ -141,16 +144,22 @@ async def draft_for_post(
             raise WrongState("у поста нет материала")
         if post.status not in (PostStatus.ranked, PostStatus.needs_edit):
             raise WrongState(f"нельзя писать черновик из статуса {post.status.value}")
-        material = draft_user_prompt(
-            title=item.title,
-            url=item.url,
-            source_name=item.source.name,
-            published_at=item.published_at,
-            audience_angle=item.ranking.audience_angle if item.ranking else "",
-            text=item.text,
-        )
+        manual = item.source.kind == SourceKind.manual
+        if manual:
+            material = manual_user_prompt(text=item.text, today=datetime.now(ZoneInfo(settings.tz)))
+            system = manual_system_prompt(settings.prompts_dir)
+        else:
+            material = draft_user_prompt(
+                title=item.title,
+                url=item.url,
+                source_name=item.source.name,
+                published_at=item.published_at,
+                audience_angle=item.ranking.audience_angle if item.ranking else "",
+                text=item.text,
+            )
+            system = draft_system_prompt(settings.prompts_dir)
         source_text = item.text
-    result = await write_fn(draft_system_prompt(settings.prompts_dir), material)
+    result = await write_fn(system, material)
     return await _store_draft(db, post_id, result, source_text, settings)
 
 
@@ -226,6 +235,9 @@ def render_review(post: Post) -> str:
     notes = pj.get("confidence_notes") or []
     if notes:
         parts.append("⚠️ <b>Модель не уверена:</b>\n" + "\n".join(f"• {escape(n)}" for n in notes))
+    dates = pj.get("dates") or []
+    if dates:
+        parts.append("📅 <b>Проверьте даты:</b>\n" + "\n".join(f"• {escape(d)}" for d in dates))
     rk = post.item.ranking if post.item else None
     meta = [f"#{post.id}", f"v{post.draft.version if post.draft else 0}"]
     if rk:

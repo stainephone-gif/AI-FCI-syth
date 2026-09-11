@@ -29,6 +29,20 @@ def draft_system_prompt(prompts_dir: str | Path) -> str:
     return _read(Path(prompts_dir) / "draft.md") + "\n\n" + style_bundle(prompts_dir)
 
 
+def manual_system_prompt(prompts_dir: str | Path) -> str:
+    return _read(Path(prompts_dir) / "manual.md") + "\n\n" + style_bundle(prompts_dir)
+
+
+WEEKDAYS = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"]
+
+
+def manual_user_prompt(*, text: str, today: datetime) -> str:
+    return (
+        f"Сегодня {today:%d.%m.%Y}, {WEEKDAYS[today.weekday()]}.\n\n"
+        f"Сообщение редактора:\n{text.strip()[:16000]}"
+    )
+
+
 def edit_system_prompt(prompts_dir: str | Path) -> str:
     return _read(Path(prompts_dir) / "edit.md") + "\n\n" + style_bundle(prompts_dir)
 
