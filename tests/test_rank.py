@@ -5,17 +5,25 @@ from sqlalchemy import select
 from app.db import Database, Item, Post, PostStatus, Ranking, Source
 from app.db.models import SourceKind
 from app.ingest.normalize import title_hash, url_hash
-from app.rank.prompt import system_prompt, user_prompt
+from app.rank.prompt import section, system_prompt, user_prompt
 from app.rank.ranker import rank_candidates, top_ranked
 from app.rank.schemas import RankResult
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_system_prompt_skips_unfilled_examples() -> None:
+def test_system_prompt_includes_editorial_files() -> None:
     text = system_prompt(ROOT / "prompts")
     assert "Оцени один материал" in text
     assert "___" not in text
+    assert "Кто читает канал" in text
+    assert "Взяли / не взяли" in text
+
+
+def test_section_extracts_one_heading() -> None:
+    md = "# T\n\n## Кто читает\n\nСтудент.\n\n## Тон\n\nСпокойный.\n"
+    assert section(md, "Кто читает") == "Студент."
+    assert section(md, "Нет такого") == ""
 
 
 def test_user_prompt_truncates_text() -> None:
@@ -81,7 +89,7 @@ async def test_rank_moves_candidates_and_orders_top(db: Database) -> None:
     assert statuses["Новость 0"] == PostStatus.ranked
     assert statuses["Новость 1"] == PostStatus.candidate  # ошибка: остаётся на следующий прогон
     assert statuses["Новость 2"] == PostStatus.ranked
-    assert {r.model for r in rankings} == {"m/rank-v1"}
+    assert {r.model for r in rankings} == {"m/rank-v2"}
 
     top = await top_ranked(db, limit=10)
     assert [i.title for i, _ in top] == ["Новость 2", "Новость 0"]
