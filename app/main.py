@@ -78,6 +78,8 @@ def build_scheduler(
 async def run() -> None:
     settings = load_settings()
     setup_logging(settings.log_level)
+    if not settings.bot_token:
+        raise SystemExit("BOT_TOKEN пуст: для запуска бота нужен токен от @BotFather в .env")
     if not settings.editor_ids:
         log.warning(
             "EDITOR_IDS пуст: режим настройки, бот отвечает только на /whoami. "

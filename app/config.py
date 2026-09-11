@@ -12,7 +12,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    bot_token: str
+    bot_token: str = ""  # нужен только полному режиму с Telegram
 
     # Провайдер моделей: anthropic | gigachat | openai (любой OpenAI-совместимый API)
     model_provider: str = "anthropic"

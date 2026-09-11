@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 from html import unescape
+from pathlib import Path
 
 from sqlalchemy import func, select
 
@@ -140,6 +141,11 @@ def main(argv: list[str] | None = None) -> None:
     c.add_argument("subtitle", nargs="?", default="")
     args = p.parse_args(argv)
 
+    if not Path(".env").exists():
+        print(
+            "Файл .env не найден в текущей папке. Создайте его: copy .env.example .env, "
+            "затем notepad .env. Проверьте, что файл не называется .env.txt."
+        )
     settings = Settings()  # type: ignore[call-arg]
     setup_logging(settings.log_level)
     match args.cmd:
