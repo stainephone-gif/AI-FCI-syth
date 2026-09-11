@@ -6,6 +6,7 @@ REMOTE_DIR ?= /opt/ai-fci-syth
 
 venv:
 	python3 -m venv .venv && .venv/bin/pip install -U pip && .venv/bin/pip install -e ".[dev]"
+	.venv/bin/playwright install chromium
 
 run:
 	.venv/bin/python -m app.main
