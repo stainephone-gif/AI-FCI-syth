@@ -1,0 +1,28 @@
+# Источники для сбора кандидатов. Редактируется без деплоя, подхватывается при запуске
+# и по команде /collect. Поле note уходит в промпт ранжирования: зачем источник каналу.
+sources:
+  - name: Anthropic News
+    kind: rss
+    url: https://www.anthropic.com/rss.xml
+    note: Релизы моделей и исследования; проверять версии моделей по тексту.
+  - name: OpenAI Blog
+    kind: rss
+    url: https://openai.com/news/rss.xml
+    note: Релизы и продуктовые новости.
+  - name: Google DeepMind Blog
+    kind: rss
+    url: https://deepmind.google/blog/rss.xml
+    note: Исследования и модели Gemini.
+  - name: arXiv cs.CL
+    kind: arxiv
+    url: http://export.arxiv.org/api/query?search_query=cat:cs.CL&sortBy=submittedDate&sortOrder=descending&max_results=50
+    note: Обработка языка. Брать только работы с понятным выводом для медиа.
+  - name: arXiv cs.CY
+    kind: arxiv
+    url: http://export.arxiv.org/api/query?search_query=cat:cs.CY&sortBy=submittedDate&sortOrder=descending&max_results=50
+    note: Компьютеры и общество; образование, медиа, этика.
+  - name: HSE News
+    kind: html
+    url: https://www.hse.ru/news/
+    enabled: false
+    note: Новости университета. Парсер появится в v1, пока выключен.

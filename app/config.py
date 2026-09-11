@@ -1,0 +1,60 @@
+"""Настройки сервиса. Всё приходит из переменных окружения или файла .env."""
+
+from __future__ import annotations
+
+import logging
+from typing import Annotated
+
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    bot_token: str
+    anthropic_api_key: str = ""
+
+    # Кто имеет право нажимать кнопки и писать боту. Все остальные игнорируются.
+    editor_ids: Annotated[frozenset[int], NoDecode] = Field(default=frozenset())
+    editor_chat_id: int | None = None
+    channel_id: str = ""
+
+    database_url: str = "sqlite+aiosqlite:///./data/syth.db"
+    tz: str = "Europe/Moscow"
+
+    collect_cron: str = "0 6 * * *"
+    digest_cron: str = "0 9 * * *"
+
+    sources_file: str = "sources.yaml"
+    prompts_dir: str = "prompts"
+
+    log_level: str = "INFO"
+
+    @field_validator("editor_ids", mode="before")
+    @classmethod
+    def _parse_editor_ids(cls, value: object) -> frozenset[int]:
+        if value is None or value == "":
+            return frozenset()
+        if isinstance(value, str):
+            parts = [p.strip() for p in value.replace(";", ",").split(",")]
+            return frozenset(int(p) for p in parts if p)
+        if isinstance(value, (list, tuple, set, frozenset)):
+            return frozenset(int(v) for v in value)
+        raise TypeError("EDITOR_IDS должен быть строкой вида '111,222'")
+
+    def is_editor(self, user_id: int | None) -> bool:
+        return user_id is not None and user_id in self.editor_ids
+
+
+def setup_logging(level: str) -> None:
+    logging.basicConfig(
+        level=getattr(logging, level.upper(), logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    # Токен бота попадает в URL запросов aiogram; на DEBUG его лучше не светить.
+    logging.getLogger("aiogram.event").setLevel(logging.INFO)
+
+
+def load_settings() -> Settings:
+    return Settings()  # type: ignore[call-arg]

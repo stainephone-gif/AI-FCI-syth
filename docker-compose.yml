@@ -1,0 +1,33 @@
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://syth:syth@db:5432/syth
+    volumes:
+      - ./sources.yaml:/srv/app/sources.yaml:ro
+      - ./prompts:/srv/app/prompts:ro
+      - cards:/srv/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: syth
+      POSTGRES_PASSWORD: syth
+      POSTGRES_DB: syth
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U syth"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
+  cards:
