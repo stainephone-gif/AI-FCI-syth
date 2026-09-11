@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     # Пусто, пока редакция не согласовала текст (шаг 9).
     post_footer: str = ""
 
+    # Карточки
+    cards_enabled: bool = True
+    cards_dir: str = "data/cards"
+    chromium_path: str = ""  # пусто: Chromium из установки Playwright
+
     log_level: str = "INFO"
 
     @field_validator("editor_ids", mode="before")

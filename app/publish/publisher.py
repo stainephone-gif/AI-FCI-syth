@@ -20,6 +20,7 @@ log = logging.getLogger(__name__)
 
 # Telegram: 4096 знаков на сообщение, 1024 на подпись к фото.
 MAX_MESSAGE = 4096
+MAX_CAPTION = 1024
 
 
 class ChannelSender(Protocol):
@@ -51,7 +52,9 @@ class AiogramSender:
     async def send_photo(self, channel_id: str, photo_path: str, caption_html: str) -> int:
         from aiogram.types import FSInputFile
 
-        msg = await self.bot.send_photo(channel_id, FSInputFile(photo_path), caption=caption_html)
+        msg = await self.bot.send_photo(
+            channel_id, FSInputFile(photo_path), caption=caption_html or None
+        )
         return msg.message_id
 
 
@@ -190,8 +193,12 @@ class Publisher:
             card = post.draft.card_path if post.draft else None
 
         try:
-            if card and len(text) <= 1024:
+            if card and len(text) <= MAX_CAPTION:
                 message_id = await self.sender.send_photo(self.settings.channel_id, card, text)
+            elif card:
+                # Подпись не помещается: карточка отдельным сообщением, текст следом.
+                await self.sender.send_photo(self.settings.channel_id, card, "")
+                message_id = await self.sender.send_text(self.settings.channel_id, text)
             else:
                 message_id = await self.sender.send_text(self.settings.channel_id, text)
         except Exception as exc:  # noqa: BLE001 - любую ошибку отдаём редактору, лок снимаем

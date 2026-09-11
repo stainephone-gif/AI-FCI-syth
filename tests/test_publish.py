@@ -27,7 +27,7 @@ class FakeSender:
         return 2000 + len(self.sent)
 
 
-async def _seed(db: Database, status: PostStatus, when=None, card=None) -> int:
+async def _seed(db: Database, status: PostStatus, when=None, card=None, body=None) -> int:
     key = uuid.uuid4().hex[:8]
     async with db.session() as s:
         src = Source(name=f"S{key}", kind=SourceKind.rss, url="https://s/rss")
@@ -48,7 +48,7 @@ async def _seed(db: Database, status: PostStatus, when=None, card=None) -> int:
             item_id=item.id,
             version=1,
             card_path=card,
-            post_json={"body": "<b>Пост</b>\n\nТекст <script>x</script>."},
+            post_json={"body": body or "<b>Пост</b>\n\nТекст <script>x</script>."},
         )
         s.add(draft)
         await s.flush()
@@ -125,7 +125,16 @@ async def test_card_goes_as_photo_when_caption_fits(db: Database, settings: Sett
     pid = await _seed(db, PostStatus.approved, card="/tmp/card.png")
     sender = FakeSender()
     await _publisher(db, settings, sender).publish(pid)
-    assert sender.sent[0][1].startswith("[photo /tmp/card.png]")
+    assert len(sender.sent) == 1
+    assert sender.sent[0][1].startswith("[photo /tmp/card.png] <b>Пост</b>")
+
+
+async def test_long_text_with_card_sends_photo_then_text(db: Database, settings: Settings) -> None:
+    pid = await _seed(db, PostStatus.approved, card="/tmp/card.png", body="x" * 1500)
+    sender = FakeSender()
+    r = await _publisher(db, settings, sender).publish(pid)
+    assert [m[1][:18] for m in sender.sent] == ["[photo /tmp/card.p", "xxxxxxxxxxxxxxxxxx"]
+    assert r.message_id == 1002  # id текстового сообщения, оно и есть пост
 
 
 async def test_schedule_cancel_and_rearm(db: Database, settings: Settings) -> None:

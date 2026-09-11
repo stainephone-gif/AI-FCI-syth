@@ -8,6 +8,7 @@ import re
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from html import escape
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -15,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.bot.telegram_html import sanitize
+from app.cards.render import CardData, render_png
 from app.config import Settings
 from app.db import Database, Draft, Event, Item, Post, PostStatus
 from app.draft.claims import check_claims
@@ -96,7 +98,37 @@ async def _store_draft(
             unconfirmed=sum(1 for c in checks if not c.confirmed),
         )
         await s.commit()
-        return draft
+        card_data = CardData(
+            title=result.card.title or result.headline,
+            subtitle=result.card.subtitle,
+            topic=(post.item.ranking.topic if post.item and post.item.ranking else "other"),
+            source_name=post.item.source.name if post.item else "",
+            date=post.item.published_at if post.item else None,
+        )
+        draft_id, version, item_id = draft.id, draft.version, draft.item_id
+    card_path = await _render_card(card_data, item_id, version, settings)
+    if card_path:
+        async with db.session() as s:
+            d = await s.get(Draft, draft_id)
+            d.card_path = card_path
+            await s.commit()
+            draft = d
+    return draft
+
+
+async def _render_card(
+    data: CardData, item_id: int, version: int, settings: Settings
+) -> str | None:
+    """Карточка не должна ломать черновик: при любой ошибке черновик идёт без неё."""
+    if not settings.cards_enabled:
+        return None
+    out = Path(settings.cards_dir) / f"{item_id}_v{version}.png"
+    try:
+        await render_png(data, out, chromium_path=settings.chromium_path or None)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Карточка для %s v%s не отрисована: %s", item_id, version, exc)
+        return None
+    return str(out)
 
 
 async def draft_for_post(
