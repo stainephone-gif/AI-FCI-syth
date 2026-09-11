@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     rank_min_relevance: int = 60  # ниже порога кандидат остаётся в базе, но не идёт дальше
     digest_top_n: int = 3  # сколько черновиков показывать редактору
 
+    # Черновики
+    draft_model: str = "claude-opus-5"
+    draft_effort: str = "medium"  # low | medium | high
+    draft_concurrency: int = 2
+    claim_match_threshold: float = 0.85  # нечёткое совпадение цитаты с источником
+    publish_slots: str = "12:00,18:00"  # кнопки «Опубликовать в …»
+
     log_level: str = "INFO"
 
     @field_validator("editor_ids", mode="before")
@@ -53,6 +60,10 @@ class Settings(BaseSettings):
 
     def is_editor(self, user_id: int | None) -> bool:
         return user_id is not None and user_id in self.editor_ids
+
+    @property
+    def slots(self) -> list[str]:
+        return [x.strip() for x in self.publish_slots.split(",") if x.strip()]
 
 
 def setup_logging(level: str) -> None:

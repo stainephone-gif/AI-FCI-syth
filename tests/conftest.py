@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from app.config import Settings
@@ -9,6 +11,7 @@ def settings(monkeypatch: pytest.MonkeyPatch) -> Settings:
     monkeypatch.setenv("BOT_TOKEN", "123456:test")
     monkeypatch.setenv("EDITOR_IDS", "111, 222")
     monkeypatch.setenv("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+    monkeypatch.setenv("PROMPTS_DIR", str(Path(__file__).resolve().parents[1] / "prompts"))
     return Settings(_env_file=None)
 
 
