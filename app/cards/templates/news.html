@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<style>
+  {% for f in fonts %}
+  @font-face {
+    font-family: "{{ f.rsplit('.', 1)[0].split('-')[0] }}";
+    src: url("{{ assets }}/fonts/{{ f }}");
+    font-weight: {{ 'bold' if 'Bold' in f else 'normal' }};
+    font-style: {{ 'italic' if 'Italic' in f else 'normal' }};
+  }
+  {% endfor %}
+  :root {
+    --paper: #F5F2EC;
+    --ink: #1B1533;
+    --muted: #6B6784;
+    --rule: #DAD5CB;
+    --accent: {{ topic_color }};
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: {{ width }}px; height: {{ height }}px; overflow: hidden; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "PTSans", "PT Sans", "Liberation Sans", "DejaVu Sans", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    padding: 72px 80px 64px;
+  }
+  .top { display: flex; justify-content: space-between; align-items: center; }
+  .brand { font-size: 30px; font-weight: bold; letter-spacing: 0.02em; }
+  .tag {
+    font-size: 24px; font-weight: bold; letter-spacing: 0.08em; text-transform: uppercase;
+    color: #fff; background: var(--accent); padding: 12px 22px; border-radius: 999px;
+  }
+  .body { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 36px; }
+  .bar { width: 120px; height: 10px; background: var(--accent); border-radius: 5px; }
+  h1 {
+    font-family: "PTSerif", "PT Serif", "Liberation Serif", "DejaVu Serif", Georgia, serif;
+    font-weight: bold; line-height: 1.1; text-wrap: balance; overflow-wrap: anywhere;
+  }
+  h1.xl { font-size: 96px; }
+  h1.lg { font-size: 76px; }
+  h1.md { font-size: 60px; }
+  .sub { font-size: 36px; line-height: 1.35; color: var(--muted); max-width: 860px; }
+  .bottom {
+    border-top: 3px solid var(--rule); padding-top: 28px;
+    display: flex; justify-content: space-between; align-items: baseline; gap: 24px;
+    font-size: 26px; color: var(--muted);
+  }
+  .bottom .src { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bottom .handle { color: var(--ink); font-weight: bold; flex-shrink: 0; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="brand">{{ data.channel }}</div>
+    <div class="tag">{{ topic_label }}</div>
+  </div>
+  <div class="body">
+    <div class="bar"></div>
+    <h1 class="{{ title_class }}">{{ data.title }}</h1>
+    {% if data.subtitle %}<p class="sub">{{ data.subtitle }}</p>{% endif %}
+  </div>
+  <div class="bottom">
+    <div class="src">{% if data.source_name %}Источник: {{ data.source_name }}{% endif %}{% if date %} · {{ date }}{% endif %}</div>
+    <div class="handle">{{ data.handle }}</div>
+  </div>
+</body>
+</html>

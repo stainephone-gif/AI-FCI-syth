@@ -17,6 +17,7 @@ dependencies = [
     "feedparser>=6.0",
     "trafilatura>=1.9",
     "jinja2>=3.1",
+    "playwright>=1.62,<1.63",
     "tzdata",
 ]
 
@@ -32,7 +33,10 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["app", "app.db", "app.bot", "app.publish", "app.ingest"]
+packages = ["app", "app.db", "app.bot", "app.publish", "app.ingest", "app.rank", "app.draft", "app.cards"]
+
+[tool.setuptools.package-data]
+"app.cards" = ["templates/*.html", "assets/fonts/*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

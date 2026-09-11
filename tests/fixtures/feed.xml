@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+  <title>Test feed</title>
+  <item>
+    <title>Anthropic releases Claude Foo</title>
+    <link>https://www.example.com/news/claude-foo?utm_source=rss</link>
+    <description><![CDATA[<p>Short summary with <b>html</b>.</p>]]></description>
+    <pubDate>FRESH_DATE</pubDate>
+  </item>
+  <item>
+    <title>Anthropic Releases Claude Foo!</title>
+    <link>https://another.example.org/2026/claude-foo</link>
+    <description>Same news, other outlet.</description>
+    <pubDate>FRESH_DATE</pubDate>
+  </item>
+  <item>
+    <title>Old news</title>
+    <link>https://example.com/old</link>
+    <description>Too old.</description>
+    <pubDate>OLD_DATE</pubDate>
+  </item>
+</channel>
+</rss>

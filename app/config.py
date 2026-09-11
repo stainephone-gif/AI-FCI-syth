@@ -29,6 +29,30 @@ class Settings(BaseSettings):
     sources_file: str = "sources.yaml"
     prompts_dir: str = "prompts"
 
+    # Сбор и ранжирование
+    freshness_hours: int = 72  # кандидаты старше окна не берём
+    fetch_full_text: bool = True  # добирать полный текст статьи по ссылке
+    rank_model: str = "claude-haiku-4-5"
+    rank_concurrency: int = 4  # параллельных запросов к модели
+    rank_min_relevance: int = 60  # ниже порога кандидат остаётся в базе, но не идёт дальше
+    digest_top_n: int = 3  # сколько черновиков показывать редактору
+
+    # Черновики
+    draft_model: str = "claude-opus-5"
+    draft_effort: str = "medium"  # low | medium | high
+    draft_concurrency: int = 2
+    claim_match_threshold: float = 0.85  # нечёткое совпадение цитаты с источником
+    publish_slots: str = "12:00,18:00"  # кнопки «Опубликовать в …»
+
+    # Публикация. Строка, которая добавляется в конец каждого поста (пометка о генерации).
+    # Пусто, пока редакция не согласовала текст (шаг 9).
+    post_footer: str = ""
+
+    # Карточки
+    cards_enabled: bool = True
+    cards_dir: str = "data/cards"
+    chromium_path: str = ""  # пусто: Chromium из установки Playwright
+
     log_level: str = "INFO"
 
     @field_validator("editor_ids", mode="before")
@@ -45,6 +69,10 @@ class Settings(BaseSettings):
 
     def is_editor(self, user_id: int | None) -> bool:
         return user_id is not None and user_id in self.editor_ids
+
+    @property
+    def slots(self) -> list[str]:
+        return [x.strip() for x in self.publish_slots.split(",") if x.strip()]
 
 
 def setup_logging(level: str) -> None:
