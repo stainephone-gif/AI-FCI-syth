@@ -6,6 +6,7 @@
 
 Архитектура и план запуска: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 Тестовая неделя по шагам: [docs/TEST-WEEK.md](docs/TEST-WEEK.md).
+Запуск на своём компьютере, в том числе без Telegram: [docs/LOCAL.md](docs/LOCAL.md).
 
 ## Локальный запуск
 
@@ -14,6 +15,13 @@ make venv                  # виртуальное окружение и зав
 cp .env.example .env       # заполнить BOT_TOKEN и EDITOR_IDS
 make run                   # бот и планировщик в одном процессе
 make test                  # тесты
+```
+
+Отладка без Telegram, нужен только ключ API:
+
+```bash
+.venv/bin/python -m app.cli collect   # сбор и ранжирование в терминал
+.venv/bin/python -m app.cli digest    # черновики в терминал
 ```
 
 По умолчанию база SQLite в `./data/syth.db`, ничего ставить не нужно.
