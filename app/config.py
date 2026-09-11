@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     claim_match_threshold: float = 0.85  # нечёткое совпадение цитаты с источником
     publish_slots: str = "12:00,18:00"  # кнопки «Опубликовать в …»
 
+    # Публикация. Строка, которая добавляется в конец каждого поста (пометка о генерации).
+    # Пусто, пока редакция не согласовала текст (шаг 9).
+    post_footer: str = ""
+
     log_level: str = "INFO"
 
     @field_validator("editor_ids", mode="before")

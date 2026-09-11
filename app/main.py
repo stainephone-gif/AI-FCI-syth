@@ -17,6 +17,7 @@ from app.db import Database
 from app.draft.writer import WriteFn, make_claude_writer
 from app.ingest.sources import sync_sources
 from app.pipeline import collect_and_rank
+from app.publish.publisher import AiogramSender, Publisher
 from app.publish.scheduler import Scheduler
 from app.rank.ranker import RankFn, make_claude_ranker
 
@@ -30,6 +31,7 @@ def build_dispatcher(
     rank_fn: RankFn,
     write_fn: WriteFn,
     signer: CallbackSigner,
+    publisher: Publisher | None = None,
 ) -> Dispatcher:
     dp = Dispatcher()
     dp.update.outer_middleware(EditorsOnlyMiddleware(settings.editor_ids))
@@ -41,6 +43,7 @@ def build_dispatcher(
     dp["rank_fn"] = rank_fn
     dp["write_fn"] = write_fn
     dp["signer"] = signer
+    dp["publisher"] = publisher
     return dp
 
 
@@ -90,10 +93,23 @@ async def run() -> None:
     signer = CallbackSigner(settings.bot_token)
     bot = Bot(settings.bot_token, default=DefaultBotProperties(parse_mode="HTML"))
     scheduler = build_scheduler(settings, db, bot, rank_fn, write_fn, signer)
-    dp = build_dispatcher(settings, db, scheduler, rank_fn, write_fn, signer)
+
+    async def notify(text: str) -> None:
+        if settings.editor_chat_id:
+            await bot.send_message(settings.editor_chat_id, text)
+
+    publisher = Publisher(db, scheduler, AiogramSender(bot), settings, notify=notify)
+    dp = build_dispatcher(settings, db, scheduler, rank_fn, write_fn, signer, publisher)
 
     scheduler.start()
-    log.info("Запуск. Редакторов: %d", len(settings.editor_ids))
+    armed, missed = await publisher.rearm_from_db()
+    if missed:
+        await notify(
+            "После перезапуска пропущены публикации: "
+            + ", ".join(f"#{i}" for i in missed)
+            + ". Опубликовать сейчас: /publish N, снять: /cancel N."
+        )
+    log.info("Запуск. Редакторов: %d, задач в очереди: %d", len(settings.editor_ids), len(armed))
     try:
         await dp.start_polling(bot, allowed_updates=["message", "callback_query"])
     finally:

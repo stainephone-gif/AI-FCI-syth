@@ -19,6 +19,7 @@ from app.db.models import PostStatus
 from app.draft import service
 from app.draft.writer import WriteFn
 from app.pipeline import collect_and_rank
+from app.publish.publisher import Publisher
 from app.publish.scheduler import Scheduler
 from app.rank.ranker import RankFn
 
@@ -31,6 +32,8 @@ HELP = (
     "/collect — собрать кандидатов из источников и оценить их\n"
     "/digest — написать черновики для лучших кандидатов и прислать сюда\n"
     "/queue — что стоит в очереди на публикацию\n"
+    "/cancel N — снять пост #N из очереди, вернуть кнопки\n"
+    "/publish N — опубликовать одобренный пост #N прямо сейчас\n"
     "/help — эта справка\n\n"
     "Правка: ответьте на сообщение с черновиком текстом замечания.\n"
     "Ничего не публикуется без нажатой кнопки."
@@ -93,6 +96,51 @@ async def cmd_queue(message: Message, db: Database) -> None:
     )
 
 
+@router.message(Command("cancel"))
+async def cmd_cancel(
+    message: Message,
+    bot: Bot,
+    settings: Settings,
+    db: Database,
+    publisher: Publisher,
+    signer: CallbackSigner,
+) -> None:
+    pid = _arg_int(message.text)
+    if pid is None:
+        await message.reply("Формат: /cancel 12")
+        return
+    if not await publisher.cancel(pid, message.from_user.id):
+        await message.reply(f"#{pid} не в очереди.")
+        return
+    await message.reply(f"#{pid} снят с публикации. Ниже черновик с кнопками.")
+    await send_review(bot, message.chat.id, db, pid, signer, settings)
+
+
+@router.message(Command("publish"))
+async def cmd_publish(message: Message, publisher: Publisher) -> None:
+    pid = _arg_int(message.text)
+    if pid is None:
+        await message.reply("Формат: /publish 12")
+        return
+    publisher.scheduler.remove(Publisher.job_id(pid))
+    r = await publisher.publish(pid)
+    if r.outcome == "skipped":
+        await message.reply(f"#{pid}: {r.reason}. Публикую только одобренные посты.")
+    elif r.outcome == "failed":
+        await message.reply(f"#{pid}: не удалось, {r.reason[:200]}")
+    # об успехе публикатор сообщает сам
+
+
+def _arg_int(text: str | None) -> int | None:
+    parts = (text or "").split(maxsplit=1)
+    if len(parts) < 2:
+        return None
+    try:
+        return int(parts[1].lstrip("#"))
+    except ValueError:
+        return None
+
+
 @router.message(Command("collect"))
 async def cmd_collect(message: Message, settings: Settings, db: Database, rank_fn: RankFn) -> None:
     await message.answer("Собираю источники и оцениваю кандидатов, это займёт пару минут.")
@@ -143,6 +191,7 @@ async def on_action(
     settings: Settings,
     db: Database,
     signer: CallbackSigner,
+    publisher: Publisher,
 ) -> None:
     action = signer.unpack(cq.data or "")
     if action is None:
@@ -155,13 +204,13 @@ async def on_action(
     if action.action == "pub":
         when = service.next_slot(action.arg, settings.tz)
         d = await service.approve(db, pid, when, actor)
-        await _after_decision(cq, bot, signer, pid, d, settings)
+        await _after_decision(cq, bot, signer, pid, d, settings, publisher)
     elif action.action == "confirm":
         d = await service.confirm(db, pid, actor)
-        await _after_decision(cq, bot, signer, pid, d, settings)
+        await _after_decision(cq, bot, signer, pid, d, settings, publisher)
     elif action.action == "reject":
         d = await service.reject(db, pid, actor)
-        await _after_decision(cq, bot, signer, pid, d, settings)
+        await _after_decision(cq, bot, signer, pid, d, settings, publisher)
     elif action.action == "time":
         await state.set_state(EditFlow.time)
         await state.update_data(post_id=pid)
@@ -176,9 +225,12 @@ async def on_action(
         await cq.answer("Неизвестное действие.")
 
 
-async def _after_decision(cq, bot, signer, pid, d: service.Decision, settings: Settings) -> None:
+async def _after_decision(
+    cq, bot, signer, pid, d: service.Decision, settings: Settings, publisher: Publisher
+) -> None:
     msg = cq.message
     if d.outcome == "approved":
+        await publisher.schedule(pid, d.scheduled_at)
         await cq.answer("В очереди.")
         await msg.edit_reply_markup(reply_markup=None)
         await msg.reply(f"#{pid} одобрен, публикация {d.scheduled_at:%d.%m в %H:%M}.")
@@ -208,8 +260,8 @@ async def on_time_text(
     state: FSMContext,
     settings: Settings,
     db: Database,
-    bot: Bot,
     signer: CallbackSigner,
+    publisher: Publisher,
 ) -> None:
     data = await state.get_data()
     pid = data.get("post_id")
@@ -220,6 +272,7 @@ async def on_time_text(
     await state.clear()
     d = await service.approve(db, pid, when, message.from_user.id)
     if d.outcome == "approved":
+        await publisher.schedule(pid, when)
         await message.reply(f"#{pid} одобрен, публикация {when:%d.%m в %H:%M}.")
     elif d.outcome == "needs_second":
         await message.reply(
