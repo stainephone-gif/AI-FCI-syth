@@ -18,6 +18,7 @@ from app.db import Database, Post, Source
 from app.db.models import PostStatus
 from app.draft import service
 from app.draft.writer import WriteFn
+from app.ingest.manual import intake
 from app.pipeline import collect_and_rank
 from app.publish.publisher import Publisher
 from app.publish.scheduler import Scheduler
@@ -31,6 +32,7 @@ HELP = (
     "/status — состояние сервиса\n"
     "/collect — собрать кандидатов из источников и оценить их\n"
     "/digest — написать черновики для лучших кандидатов и прислать сюда\n"
+    "/post текст — пост из вашего сообщения: событие, набор, работа студентов\n"
     "/queue — что стоит в очереди на публикацию\n"
     "/cancel N — снять пост #N из очереди, вернуть кнопки\n"
     "/publish N — опубликовать одобренный пост #N прямо сейчас\n"
@@ -44,6 +46,23 @@ HELP = (
 @router.message(Command("help"))
 async def cmd_help(message: Message) -> None:
     await message.answer(HELP)
+
+
+@router.message(Command("whoami"))
+async def cmd_whoami(message: Message, settings: Settings) -> None:
+    """Доступна всем: нужна один раз, чтобы заполнить EDITOR_IDS и EDITOR_CHAT_ID."""
+    uid = message.from_user.id if message.from_user else None
+    role = "редактор" if settings.is_editor(uid) else "не в списке редакторов"
+    lines = [
+        f"Ваш id: <code>{uid}</code> ({role})",
+        f"Id этого чата: <code>{message.chat.id}</code>",
+    ]
+    origin = getattr(message.reply_to_message, "forward_origin", None)
+    chat = getattr(origin, "chat", None)
+    if chat is not None and getattr(chat, "type", "") == "channel":
+        lines.append(f"Id канала, откуда переслан пост: <code>{chat.id}</code>")
+    lines.append("Скопируйте числа в .env: EDITOR_IDS, EDITOR_CHAT_ID, CHANNEL_ID.")
+    await message.reply("\n".join(lines))
 
 
 @router.message(Command("status"))
@@ -94,6 +113,39 @@ async def cmd_queue(message: Message, db: Database) -> None:
             for p in rows
         )
     )
+
+
+@router.message(Command("post"))
+async def cmd_post(
+    message: Message,
+    bot: Bot,
+    settings: Settings,
+    db: Database,
+    write_fn: WriteFn,
+    signer: CallbackSigner,
+) -> None:
+    text = (message.text or "").split(maxsplit=1)
+    if len(text) < 2 or len(text[1].strip()) < 10:
+        await message.reply(
+            "Напишите, о чём пост, одним сообщением после команды. "
+            "Например: /post в четверг семинар с ИТМО про агентов, ссылка на регистрацию: …"
+        )
+        return
+    pid = await intake(
+        db,
+        text[1],
+        message_id=message.message_id,
+        actor=message.from_user.id,
+        fetch_link=settings.fetch_full_text,
+    )
+    await message.reply(f"Пишу пост #{pid}. Даты проверьте отдельно, они в конце черновика.")
+    try:
+        await service.draft_for_post(db, write_fn, pid, settings)
+    except Exception as exc:  # noqa: BLE001
+        log.exception("Ручной пост %s", pid)
+        await message.reply(f"#{pid}: черновик не получился: {str(exc)[:200]}")
+        return
+    await send_review(bot, message.chat.id, db, pid, signer, settings)
 
 
 @router.message(Command("cancel"))

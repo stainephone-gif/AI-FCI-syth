@@ -28,3 +28,8 @@ class PostDraft(BaseModel):
     confidence_notes: list[str] = Field(
         description="Что не удалось подтвердить текстом источника; пусто, если всё подтверждено"
     )
+    dates: list[str] = Field(
+        default_factory=list,
+        description="Все даты и время, упомянутые в посте, «ДД.ММ.ГГГГ, день недели, ЧЧ:ММ»; "
+        "пусто, если дат нет",
+    )
