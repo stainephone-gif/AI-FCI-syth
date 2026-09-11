@@ -256,3 +256,25 @@ def test_markdown_from_model_becomes_telegram_html() -> None:
 def test_claim_check_accepts_swapped_fields() -> None:
     swapped = [Claim(text="40% fewer factual errors", quote="Ошибок меньше на 40%")]
     assert check_claims(swapped, SOURCE, 0.85)[0].confirmed
+
+
+async def test_quote_fix_pass_confirms_translated_claims(db: Database, settings: Settings) -> None:
+    settings.cards_enabled = False
+    pid = await _seed(db)
+
+    async def fake_write(system, material):
+        d = _draft()
+        d.claims = [Claim(text="Ошибок меньше на 40%", quote="сорок процентов меньше ошибок")]
+        return d
+
+    calls = []
+
+    async def fake_fix(source_text, claims):
+        calls.append([c.text for c in claims])
+        return [Claim(text=c.text, quote="40% fewer factual errors") for c in claims]
+
+    draft = await service.draft_for_post(db, fake_write, pid, settings, fake_fix)
+    assert calls == [["Ошибок меньше на 40%"]]
+    assert all(c["confirmed"] for c in draft.post_json["checks"])
+    assert draft.post_json["claims"][0]["quote"] == "40% fewer factual errors"
+    assert "style_notes" in draft.post_json

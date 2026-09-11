@@ -21,6 +21,7 @@ from app.config import Settings
 from app.db import Database, Draft, Event, Item, Post, PostStatus
 from app.db.models import SourceKind
 from app.draft.claims import check_claims
+from app.draft.lint import lint
 from app.draft.prompt import (
     PROMPT_VERSION,
     draft_system_prompt,
@@ -30,7 +31,8 @@ from app.draft.prompt import (
     manual_system_prompt,
     manual_user_prompt,
 )
-from app.draft.schemas import PostDraft
+from app.draft.quotes import FixQuotesFn
+from app.draft.schemas import Claim, PostDraft
 from app.draft.writer import WriteFn
 from app.rank.ranker import top_ranked
 
@@ -68,11 +70,29 @@ def _event(s: AsyncSession, post_id: int, actor: str, action: str, **payload) ->
 
 
 async def _store_draft(
-    db: Database, post_id: int, result: PostDraft, source_text: str, settings: Settings
+    db: Database,
+    post_id: int,
+    result: PostDraft,
+    source_text: str,
+    settings: Settings,
+    fix_fn: FixQuotesFn | None = None,
 ) -> Draft:
     checks = check_claims(result.claims, source_text, settings.claim_match_threshold)
+    bad = [c for c in checks if not c.confirmed]
+    if bad and fix_fn is not None:
+        # Второй проход: модель ищет дословные фрагменты только для неподтверждённых.
+        try:
+            fixed = await fix_fn(source_text, [Claim(text=c.text, quote=c.quote) for c in bad])
+            by_text = {c.text: c.quote for c in fixed}
+            result.claims = [
+                Claim(text=c.text, quote=by_text.get(c.text, c.quote)) for c in result.claims
+            ]
+            checks = check_claims(result.claims, source_text, settings.claim_match_threshold)
+        except Exception as exc:  # noqa: BLE001 - не удалось уточнить, оставляем первую проверку
+            log.warning("Уточнение цитат для поста %s не удалось: %s", post_id, exc)
     payload = result.model_dump()
     payload["checks"] = [asdict(c) for c in checks]
+    payload["style_notes"] = lint(result.body)
     async with db.session() as s:
         post = await _load(s, post_id)
         last = await s.scalar(
@@ -135,7 +155,11 @@ async def _render_card(
 
 
 async def draft_for_post(
-    db: Database, write_fn: WriteFn, post_id: int, settings: Settings
+    db: Database,
+    write_fn: WriteFn,
+    post_id: int,
+    settings: Settings,
+    fix_fn: FixQuotesFn | None = None,
 ) -> Draft:
     async with db.session() as s:
         post = await _load(s, post_id)
@@ -160,10 +184,12 @@ async def draft_for_post(
             system = draft_system_prompt(settings.prompts_dir)
         source_text = item.text
     result = await write_fn(system, material)
-    return await _store_draft(db, post_id, result, source_text, settings)
+    return await _store_draft(db, post_id, result, source_text, settings, fix_fn)
 
 
-async def draft_top(db: Database, write_fn: WriteFn, settings: Settings) -> list[Draft]:
+async def draft_top(
+    db: Database, write_fn: WriteFn, settings: Settings, fix_fn: FixQuotesFn | None = None
+) -> list[Draft]:
     """Черновики для лучших кандидатов выше порога."""
     top = await top_ranked(db, limit=settings.digest_top_n)
     chosen = [item for item, rk in top if rk.relevance >= settings.rank_min_relevance]
@@ -178,7 +204,7 @@ async def draft_top(db: Database, write_fn: WriteFn, settings: Settings) -> list
     async def one(pid: int) -> Draft | None:
         async with sem:
             try:
-                return await draft_for_post(db, write_fn, pid, settings)
+                return await draft_for_post(db, write_fn, pid, settings, fix_fn)
             except Exception as exc:  # noqa: BLE001
                 log.warning("Черновик для поста %s не написан: %s", pid, exc)
                 return None
@@ -188,7 +214,13 @@ async def draft_top(db: Database, write_fn: WriteFn, settings: Settings) -> list
 
 
 async def revise(
-    db: Database, write_fn: WriteFn, post_id: int, remark: str, actor: str, settings: Settings
+    db: Database,
+    write_fn: WriteFn,
+    post_id: int,
+    remark: str,
+    actor: str,
+    settings: Settings,
+    fix_fn: FixQuotesFn | None = None,
 ) -> Draft:
     async with db.session() as s:
         post = await _load(s, post_id)
@@ -208,7 +240,7 @@ async def revise(
         source_text = post.item.text
         await s.commit()
     result = await write_fn(edit_system_prompt(settings.prompts_dir), material)
-    return await _store_draft(db, post_id, result, source_text, settings)
+    return await _store_draft(db, post_id, result, source_text, settings, fix_fn)
 
 
 # --- показ редактору ---------------------------------------------------------
@@ -235,6 +267,9 @@ def render_review(post: Post) -> str:
     notes = pj.get("confidence_notes") or []
     if notes:
         parts.append("⚠️ <b>Модель не уверена:</b>\n" + "\n".join(f"• {escape(n)}" for n in notes))
+    style = pj.get("style_notes") or []
+    if style:
+        parts.append("✏️ <b>Стиль:</b>\n" + "\n".join(f"• {escape(n)}" for n in style))
     dates = pj.get("dates") or []
     if dates:
         parts.append("📅 <b>Проверьте даты:</b>\n" + "\n".join(f"• {escape(d)}" for d in dates))
