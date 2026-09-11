@@ -73,11 +73,24 @@
    ```
    Открывать именно так, из PowerShell: если создавать файл через Блокнот
    вручную, он сохранится как `.env.txt` и не будет прочитан.
-2. Для консольного режима достаточно заполнить одну строку:
+2. Выбрать провайдера моделей и вписать ключ. Для GigaChat три строки:
    ```
-   ANTHROPIC_API_KEY=sk-ant-...
+   MODEL_PROVIDER=gigachat
+   GIGACHAT_CREDENTIALS=<Authorization key из личного кабинета developers.sber.ru>
+   GIGACHAT_SCOPE=GIGACHAT_API_PERS
    ```
-   Сохранить (Ctrl+S) и закрыть Блокнот. Остальные строки пока не трогать.
+   Scope `GIGACHAT_API_PERS` для ключа физлица, `GIGACHAT_API_B2B` или
+   `GIGACHAT_API_CORP` для организации: смотрите, что написано в кабинете
+   рядом с ключом. Для Claude вместо этого `MODEL_PROVIDER=anthropic` и
+   `ANTHROPIC_API_KEY=...`. Сохранить (Ctrl+S) и закрыть Блокнот.
+3. Проверить ключ:
+   ```powershell
+   .venv\Scripts\python -m app.cli models
+   ```
+   Команда печатает список доступных моделей и какие из них выбраны для
+   ранжирования и черновиков. Если в списке нет `GigaChat-2` или
+   `GigaChat-2-Max`, вписать в `.env` имена из списка в строки `RANK_MODEL`
+   и `DRAFT_MODEL`.
 
 ## 5. Консольный режим, без Telegram
 

@@ -7,19 +7,19 @@ import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
-from anthropic import AsyncAnthropic
 
 from app.bot.handlers import router, run_digest
 from app.bot.keyboards import CallbackSigner
 from app.bot.middleware import EditorsOnlyMiddleware
 from app.config import Settings, load_settings, setup_logging
 from app.db import Database
-from app.draft.writer import WriteFn, make_claude_writer
+from app.draft.writer import WriteFn
 from app.ingest.sources import sync_sources
+from app.llm import build_model_functions
 from app.pipeline import collect_and_rank
 from app.publish.publisher import AiogramSender, Publisher
 from app.publish.scheduler import Scheduler
-from app.rank.ranker import RankFn, make_claude_ranker
+from app.rank.ranker import RankFn
 
 log = logging.getLogger("app")
 
@@ -88,11 +88,7 @@ async def run() -> None:
     await db.create_all()
     await sync_sources(db, settings.sources_file)
 
-    if not settings.anthropic_api_key:
-        raise SystemExit("ANTHROPIC_API_KEY пуст: ранжирование не заработает. Заполните .env.")
-    client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-    rank_fn = make_claude_ranker(client, settings.rank_model)
-    write_fn = make_claude_writer(client, settings.draft_model, settings.draft_effort)
+    rank_fn, write_fn = build_model_functions(settings)
     signer = CallbackSigner(settings.bot_token)
     bot = Bot(settings.bot_token, default=DefaultBotProperties(parse_mode="HTML"))
     scheduler = build_scheduler(settings, db, bot, rank_fn, write_fn, signer)

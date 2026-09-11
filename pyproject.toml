@@ -6,6 +6,8 @@ requires-python = ">=3.11"
 dependencies = [
     "aiogram>=3.13,<4",
     "anthropic>=0.40",
+    "gigachat>=0.2",
+    "openai>=1.50",
     "apscheduler>=3.10,<4",
     "sqlalchemy[asyncio]>=2.0",
     "aiosqlite>=0.20",
@@ -33,7 +35,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["app", "app.db", "app.bot", "app.publish", "app.ingest", "app.rank", "app.draft", "app.cards"]
+packages = ["app", "app.db", "app.bot", "app.publish", "app.ingest", "app.rank", "app.draft", "app.cards", "app.llm"]
 
 [tool.setuptools.package-data]
 "app.cards" = ["templates/*.html", "assets/fonts/*"]
