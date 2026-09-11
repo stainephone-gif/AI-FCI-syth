@@ -225,8 +225,9 @@ async def run_digest(
     db: Database,
     write_fn: WriteFn,
     signer: CallbackSigner,
+    fix_fn: FixQuotesFn | None = None,
 ) -> int:
-    drafts = await service.draft_top(db, write_fn, settings)
+    drafts = await service.draft_top(db, write_fn, settings, fix_fn)
     for d in drafts:
         async with db.session() as s:
             post_id = await s.scalar(select(Post.id).where(Post.draft_id == d.id))

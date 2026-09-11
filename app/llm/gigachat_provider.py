@@ -6,7 +6,11 @@ import asyncio
 import logging
 
 from gigachat import GigaChat
-from gigachat.exceptions import RateLimitError
+from gigachat.exceptions import (
+    BadRequestError,
+    RateLimitError,
+    UnprocessableEntityError,
+)
 from gigachat.models import Chat, Messages, MessagesRole
 from pydantic import BaseModel
 
@@ -74,9 +78,12 @@ class GigaChatProvider:
                 return parsed
             except RateLimitError:
                 raise  # лимит, а не формат: режим не меняем, ошибка уйдёт наверх
-            except Exception as exc:  # noqa: BLE001 - бета-режим SDK, переходим на обычный JSON
-                log.warning("GigaChat achat_parse не сработал (%s), дальше обычный JSON", exc)
+            except (BadRequestError, UnprocessableEntityError) as exc:
+                # Сервер не принял response_format: эта модель схемы не умеет, дальше без них.
+                log.warning("GigaChat отверг response_format (%s), дальше обычный JSON", exc)
                 self.schema_mode = False
+            except Exception as exc:  # noqa: BLE001 - разовый сбой (битый JSON): повтор без схемы
+                log.info("GigaChat achat_parse: %s; этот запрос повторю обычным JSON", exc)
 
         async def chat_fn(m: list[dict[str, str]]) -> str:
             return await self.chat(model, m)

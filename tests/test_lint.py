@@ -33,6 +33,7 @@ def test_lint_catches_style_violations() -> None:
     assert "восклицательных знаков: 3" in joined
     assert "маркеры не из набора" in joined and "✅" in joined
     assert "нет блока" in joined
+    assert "без эмодзи-маркера" in " | ".join(lint("Что это значит для медийщика: x"))
 
 
 def test_apply_fixes_by_text_then_by_order() -> None:

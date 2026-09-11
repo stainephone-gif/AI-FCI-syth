@@ -89,3 +89,20 @@ async def test_manual_draft_uses_manual_prompt_and_shows_dates(
     assert "📅 <b>Проверьте даты:</b>\n• 17.09.2026, четверг, 18:00" in text
     assert "Не нашёл в источнике" not in text
     assert "Редакция" in text
+
+
+async def test_dates_block_hidden_for_news_posts(db: Database, settings: Settings) -> None:
+    from tests.test_draft import _draft, _seed
+
+    settings.cards_enabled = False
+    pid = await _seed(db)
+
+    async def fake_write(system, material):
+        d = _draft()
+        d.dates = ["09.09.2026"]
+        return d
+
+    await service.draft_for_post(db, fake_write, pid, settings)
+    async with db.session() as s:
+        text = service.render_review(await service._load(s, pid))
+    assert "Проверьте даты" not in text
