@@ -17,6 +17,7 @@ from app.config import Settings
 from app.db import Database, Post, Source
 from app.db.models import PostStatus
 from app.draft import service
+from app.draft.quotes import FixQuotesFn
 from app.draft.writer import WriteFn
 from app.ingest.manual import intake
 from app.pipeline import collect_and_rank
@@ -123,6 +124,7 @@ async def cmd_post(
     db: Database,
     write_fn: WriteFn,
     signer: CallbackSigner,
+    fix_fn: FixQuotesFn | None = None,
 ) -> None:
     text = (message.text or "").split(maxsplit=1)
     if len(text) < 2 or len(text[1].strip()) < 10:
@@ -140,7 +142,7 @@ async def cmd_post(
     )
     await message.reply(f"Пишу пост #{pid}. Даты проверьте отдельно, они в конце черновика.")
     try:
-        await service.draft_for_post(db, write_fn, pid, settings)
+        await service.draft_for_post(db, write_fn, pid, settings, fix_fn)
     except Exception as exc:  # noqa: BLE001
         log.exception("Ручной пост %s", pid)
         await message.reply(f"#{pid}: черновик не получился: {str(exc)[:200]}")
@@ -208,9 +210,10 @@ async def cmd_digest(
     db: Database,
     write_fn: WriteFn,
     signer: CallbackSigner,
+    fix_fn: FixQuotesFn | None = None,
 ) -> None:
     await message.answer("Пишу черновики для лучших кандидатов.")
-    n = await run_digest(bot, message.chat.id, settings, db, write_fn, signer)
+    n = await run_digest(bot, message.chat.id, settings, db, write_fn, signer, fix_fn)
     if n == 0:
         await message.answer("Кандидатов выше порога нет. Запустите /collect или подождите утра.")
 
@@ -345,10 +348,11 @@ async def on_remark_text(
     bot: Bot,
     write_fn: WriteFn,
     signer: CallbackSigner,
+    fix_fn: FixQuotesFn | None = None,
 ) -> None:
     data = await state.get_data()
     await state.clear()
-    await _revise_and_resend(message, data["post_id"], settings, db, bot, write_fn, signer)
+    await _revise_and_resend(message, data["post_id"], settings, db, bot, write_fn, signer, fix_fn)
 
 
 @router.message(F.reply_to_message, F.text)
@@ -359,18 +363,23 @@ async def on_reply_to_draft(
     bot: Bot,
     write_fn: WriteFn,
     signer: CallbackSigner,
+    fix_fn: FixQuotesFn | None = None,
 ) -> None:
     """Ответ текстом на сообщение с черновиком = замечание."""
     pid = await service.post_by_review_message(db, message.reply_to_message.message_id)
     if pid is None:
         return
-    await _revise_and_resend(message, pid, settings, db, bot, write_fn, signer)
+    await _revise_and_resend(message, pid, settings, db, bot, write_fn, signer, fix_fn)
 
 
-async def _revise_and_resend(message, pid, settings, db, bot, write_fn, signer) -> None:
+async def _revise_and_resend(
+    message, pid, settings, db, bot, write_fn, signer, fix_fn=None
+) -> None:
     await message.reply(f"Правлю #{pid}.")
     try:
-        await service.revise(db, write_fn, pid, message.text, str(message.from_user.id), settings)
+        await service.revise(
+            db, write_fn, pid, message.text, str(message.from_user.id), settings, fix_fn
+        )
     except service.WrongState as exc:
         await message.reply(f"Не получилось: {exc}")
         return

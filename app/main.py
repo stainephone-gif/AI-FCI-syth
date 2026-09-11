@@ -13,6 +13,7 @@ from app.bot.keyboards import CallbackSigner
 from app.bot.middleware import EditorsOnlyMiddleware
 from app.config import Settings, load_settings, setup_logging
 from app.db import Database
+from app.draft.quotes import FixQuotesFn
 from app.draft.writer import WriteFn
 from app.ingest.sources import sync_sources
 from app.llm import build_model_functions
@@ -32,6 +33,7 @@ def build_dispatcher(
     write_fn: WriteFn,
     signer: CallbackSigner,
     publisher: Publisher | None = None,
+    fix_fn: FixQuotesFn | None = None,
 ) -> Dispatcher:
     dp = Dispatcher()
     dp.update.outer_middleware(EditorsOnlyMiddleware(settings.editor_ids))
@@ -44,6 +46,7 @@ def build_dispatcher(
     dp["write_fn"] = write_fn
     dp["signer"] = signer
     dp["publisher"] = publisher
+    dp["fix_fn"] = fix_fn
     return dp
 
 
@@ -54,6 +57,7 @@ def build_scheduler(
     rank_fn: RankFn,
     write_fn: WriteFn,
     signer: CallbackSigner,
+    fix_fn: FixQuotesFn | None = None,
 ) -> Scheduler:
     scheduler = Scheduler(settings.tz)
 
@@ -66,7 +70,7 @@ def build_scheduler(
         if not (bot and settings.editor_chat_id):
             log.warning("digest: EDITOR_CHAT_ID не задан, дайджест некуда слать")
             return
-        n = await run_digest(bot, settings.editor_chat_id, settings, db, write_fn, signer)
+        n = await run_digest(bot, settings.editor_chat_id, settings, db, write_fn, signer, fix_fn)
         if n == 0:
             await bot.send_message(settings.editor_chat_id, "Сегодня кандидатов выше порога нет.")
 
@@ -90,17 +94,18 @@ async def run() -> None:
     await db.create_all()
     await sync_sources(db, settings.sources_file)
 
-    rank_fn, write_fn = build_model_functions(settings)
+    fns = build_model_functions(settings)
+    rank_fn, write_fn, fix_fn = fns.rank, fns.write, fns.fix_quotes
     signer = CallbackSigner(settings.bot_token)
     bot = Bot(settings.bot_token, default=DefaultBotProperties(parse_mode="HTML"))
-    scheduler = build_scheduler(settings, db, bot, rank_fn, write_fn, signer)
+    scheduler = build_scheduler(settings, db, bot, rank_fn, write_fn, signer, fix_fn)
 
     async def notify(text: str) -> None:
         if settings.editor_chat_id:
             await bot.send_message(settings.editor_chat_id, text)
 
     publisher = Publisher(db, scheduler, AiogramSender(bot), settings, notify=notify)
-    dp = build_dispatcher(settings, db, scheduler, rank_fn, write_fn, signer, publisher)
+    dp = build_dispatcher(settings, db, scheduler, rank_fn, write_fn, signer, publisher, fix_fn)
 
     scheduler.start()
     armed, missed = await publisher.rearm_from_db()

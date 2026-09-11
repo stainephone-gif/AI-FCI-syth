@@ -63,8 +63,8 @@ async def cmd_collect(settings: Settings) -> None:
 
 async def cmd_digest(settings: Settings) -> None:
     db = await _setup(settings)
-    _, write_fn = _fns(settings)
-    drafts = await service.draft_top(db, write_fn, settings)
+    fns = _fns(settings)
+    drafts = await service.draft_top(db, fns.write, settings, fns.fix_quotes)
     if not drafts:
         print("Кандидатов выше порога нет. Сначала: python -m app.cli collect")
     for d in drafts:
@@ -76,17 +76,17 @@ async def cmd_digest(settings: Settings) -> None:
 
 async def cmd_draft(settings: Settings, post_id: int) -> None:
     db = await _setup(settings)
-    _, write_fn = _fns(settings)
-    await service.draft_for_post(db, write_fn, post_id, settings)
+    fns = _fns(settings)
+    await service.draft_for_post(db, fns.write, post_id, settings, fns.fix_quotes)
     await _print_post(db, post_id)
     await db.close()
 
 
 async def cmd_post(settings: Settings, text: str) -> None:
     db = await _setup(settings)
-    _, write_fn = _fns(settings)
+    fns = _fns(settings)
     pid = await intake(db, text, message_id=0, actor=0, fetch_link=settings.fetch_full_text)
-    await service.draft_for_post(db, write_fn, pid, settings)
+    await service.draft_for_post(db, fns.write, pid, settings, fns.fix_quotes)
     await _print_post(db, pid)
     await db.close()
 
