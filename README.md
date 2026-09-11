@@ -6,7 +6,7 @@
 
 Архитектура и план запуска: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 Тестовая неделя по шагам: [docs/TEST-WEEK.md](docs/TEST-WEEK.md).
-Запуск на своём компьютере, в том числе без Telegram: [docs/LOCAL.md](docs/LOCAL.md).
+Запуск на своём компьютере, в том числе без Telegram: [docs/LOCAL.md](docs/LOCAL.md), отдельно для Windows: [docs/WINDOWS.md](docs/WINDOWS.md).
 
 ## Локальный запуск
 
