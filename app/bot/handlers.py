@@ -53,11 +53,16 @@ async def cmd_whoami(message: Message, settings: Settings) -> None:
     """Доступна всем: нужна один раз, чтобы заполнить EDITOR_IDS и EDITOR_CHAT_ID."""
     uid = message.from_user.id if message.from_user else None
     role = "редактор" if settings.is_editor(uid) else "не в списке редакторов"
-    await message.reply(
-        f"Ваш id: <code>{uid}</code> ({role})\n"
-        f"Id этого чата: <code>{message.chat.id}</code>\n"
-        "Скопируйте эти числа в .env: EDITOR_IDS и EDITOR_CHAT_ID."
-    )
+    lines = [
+        f"Ваш id: <code>{uid}</code> ({role})",
+        f"Id этого чата: <code>{message.chat.id}</code>",
+    ]
+    origin = getattr(message.reply_to_message, "forward_origin", None)
+    chat = getattr(origin, "chat", None)
+    if chat is not None and getattr(chat, "type", "") == "channel":
+        lines.append(f"Id канала, откуда переслан пост: <code>{chat.id}</code>")
+    lines.append("Скопируйте числа в .env: EDITOR_IDS, EDITOR_CHAT_ID, CHANNEL_ID.")
+    await message.reply("\n".join(lines))
 
 
 @router.message(Command("status"))
