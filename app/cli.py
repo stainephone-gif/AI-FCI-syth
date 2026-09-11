@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import sys
 from html import unescape
 from pathlib import Path
 
@@ -114,6 +115,27 @@ async def cmd_models(settings: Settings) -> None:
     )
 
 
+def cmd_reset(settings: Settings, yes: bool) -> None:
+    """Удаляет SQLite-базу и папку карточек. Только для локальной отладки."""
+    import shutil
+
+    url = settings.database_url
+    if not url.startswith("sqlite"):
+        sys.exit("reset работает только с SQLite; для Postgres пересоздайте базу средствами СУБД")
+    db_path = Path(url.split("///", 1)[-1])
+    cards = Path(settings.cards_dir)
+    if not yes:
+        print(f"Будут удалены: {db_path} и папка {cards}. Повторите с флагом --yes.")
+        return
+    if db_path.exists():
+        db_path.unlink()
+        print(f"Удалена база {db_path}")
+    if cards.exists():
+        shutil.rmtree(cards)
+        print(f"Удалена папка {cards}")
+    print("Готово. Следующий шаг: python -m app.cli collect")
+
+
 async def cmd_status(settings: Settings) -> None:
     db = await _setup(settings)
     async with db.session() as s:
@@ -135,6 +157,7 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("digest")
     sub.add_parser("status")
     sub.add_parser("models")
+    sub.add_parser("reset").add_argument("--yes", action="store_true")
     sub.add_parser("draft").add_argument("post_id", type=int)
     sub.add_parser("post").add_argument("text")
     c = sub.add_parser("card")
@@ -164,6 +187,8 @@ def main(argv: list[str] | None = None) -> None:
             asyncio.run(cmd_status(settings))
         case "models":
             asyncio.run(cmd_models(settings))
+        case "reset":
+            cmd_reset(settings, args.yes)
 
 
 if __name__ == "__main__":
