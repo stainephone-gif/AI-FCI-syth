@@ -104,6 +104,7 @@ async def cmd_card(settings: Settings, title: str, subtitle: str) -> None:
 
 async def cmd_models(settings: Settings) -> None:
     """Проверка ключа: список моделей провайдера."""
+    print(f"Провайдер из .env: {settings.model_provider}")
     names = await list_models(settings)
     print(f"Провайдер {settings.model_provider}, доступно моделей: {len(names)}")
     for n in names:
