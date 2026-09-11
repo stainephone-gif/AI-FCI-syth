@@ -271,7 +271,8 @@ def render_review(post: Post) -> str:
     if style:
         parts.append("✏️ <b>Стиль:</b>\n" + "\n".join(f"• {escape(n)}" for n in style))
     dates = pj.get("dates") or []
-    if dates:
+    is_manual = bool(post.item and post.item.source.kind == SourceKind.manual)
+    if dates and is_manual:  # для анонсов даты критичны, для новостей это дата публикации
         parts.append("📅 <b>Проверьте даты:</b>\n" + "\n".join(f"• {escape(d)}" for d in dates))
     rk = post.item.ranking if post.item else None
     meta = [f"#{post.id}", f"v{post.draft.version if post.draft else 0}"]

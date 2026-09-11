@@ -50,7 +50,10 @@ def lint(body_html: str, *, min_len: int = 800, max_len: int = 2500) -> list[str
     if foreign:
         notes.append("маркеры не из набора стайлгайда: " + " ".join(sorted(foreign)))
 
-    if "Что это значит для медийщика" not in text:
+    takeaway = [ln for ln in text.splitlines() if "Что это значит для медийщика" in ln]
+    if not takeaway:
         notes.append("нет блока «Что это значит для медийщика»")
+    elif not _EMOJI_START.match(takeaway[0]):
+        notes.append("блок «Что это значит для медийщика» без эмодзи-маркера в начале")
 
     return notes
