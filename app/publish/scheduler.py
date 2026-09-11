@@ -31,11 +31,3 @@ class Scheduler:
     def shutdown(self) -> None:
         if self._sched.running:
             self._sched.shutdown(wait=False)
-
-
-async def job_collect() -> None:
-    log.info("collect: сбор источников ещё не реализован (шаг 11)")
-
-
-async def job_digest() -> None:
-    log.info("digest: утренний дайджест ещё не реализован (шаг 12)")

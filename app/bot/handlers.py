@@ -10,7 +10,9 @@ from sqlalchemy import func, select
 from app.config import Settings
 from app.db import Database, Post, Source
 from app.db.models import PostStatus
+from app.pipeline import collect_and_rank
 from app.publish.scheduler import Scheduler
+from app.rank.ranker import RankFn
 
 router = Router(name="editorial")
 
@@ -18,7 +20,7 @@ HELP = (
     "Синтетическая редакция. Команды:\n"
     "/status — состояние сервиса\n"
     "/queue — что стоит в очереди на публикацию\n"
-    "/collect — собрать кандидатов из источников (появится на шаге 11)\n"
+    "/collect — собрать кандидатов из источников и оценить их\n"
     "/help — эта справка\n\n"
     "Ничего не публикуется без нажатой кнопки."
 )
@@ -36,16 +38,17 @@ async def cmd_status(
 ) -> None:
     async with db.session() as s:
         sources_total = await s.scalar(select(func.count(Source.id)))
-        sources_on = await s.scalar(
-            select(func.count(Source.id)).where(Source.enabled.is_(True))
-        )
+        sources_on = await s.scalar(select(func.count(Source.id)).where(Source.enabled.is_(True)))
         by_status = dict(
             (await s.execute(select(Post.status, func.count(Post.id)).group_by(Post.status))).all()
         )
-    jobs = "\n".join(
-        f"  {j.id}: {j.next_run_time:%d.%m %H:%M}" if j.next_run_time else f"  {j.id}: —"
-        for j in scheduler.jobs()
-    ) or "  нет задач"
+    jobs = (
+        "\n".join(
+            f"  {j.id}: {j.next_run_time:%d.%m %H:%M}" if j.next_run_time else f"  {j.id}: —"
+            for j in scheduler.jobs()
+        )
+        or "  нет задач"
+    )
     posts = ", ".join(f"{st.value} {n}" for st, n in by_status.items()) or "пока нет"
     db_kind = settings.database_url.split("+", 1)[0].split(":", 1)[0]
     text = (
@@ -80,5 +83,7 @@ async def cmd_queue(message: Message, db: Database) -> None:
 
 
 @router.message(Command("collect"))
-async def cmd_collect(message: Message) -> None:
-    await message.answer("Сбор источников появится на шаге 11. Пока команда ничего не делает.")
+async def cmd_collect(message: Message, settings: Settings, db: Database, rank_fn: RankFn) -> None:
+    await message.answer("Собираю источники и оцениваю кандидатов, это займёт пару минут.")
+    report = await collect_and_rank(settings, db, rank_fn)
+    await message.answer(report, disable_web_page_preview=True)

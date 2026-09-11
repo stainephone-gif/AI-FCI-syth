@@ -60,6 +60,9 @@ class Item(Base):
     url: Mapped[str] = mapped_column(String(2000))
     url_hash: Mapped[str] = mapped_column(String(64), index=True)
     title: Mapped[str] = mapped_column(String(500))
+    # Хеш нормализованного заголовка: один релиз в трёх изданиях схлопывается.
+    title_hash: Mapped[str] = mapped_column(String(64), index=True, default="")
+    duplicate_of_id: Mapped[int | None] = mapped_column(ForeignKey("items.id"))
     text: Mapped[str] = mapped_column(Text, default="")
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -129,15 +132,14 @@ POST_TRANSITIONS: dict[PostStatus, frozenset[PostStatus]] = {
 }
 
 # В эти статусы переводит только человек через callback в редакторском чате.
-HUMAN_ONLY_STATUSES = frozenset(
-    {PostStatus.approved, PostStatus.needs_edit, PostStatus.rejected}
-)
+HUMAN_ONLY_STATUSES = frozenset({PostStatus.approved, PostStatus.needs_edit, PostStatus.rejected})
 
 
 class Post(Base):
     __tablename__ = "posts"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    item_id: Mapped[int | None] = mapped_column(ForeignKey("items.id"), unique=True)
     draft_id: Mapped[int | None] = mapped_column(ForeignKey("drafts.id"))
     status: Mapped[PostStatus] = mapped_column(
         Enum(PostStatus, native_enum=False, length=16), default=PostStatus.candidate, index=True
@@ -154,6 +156,7 @@ class Post(Base):
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
 
+    item: Mapped[Item | None] = relationship()
     draft: Mapped[Draft | None] = relationship()
     events: Mapped[list[Event]] = relationship(back_populates="post")
 

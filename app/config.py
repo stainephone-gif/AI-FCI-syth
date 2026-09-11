@@ -29,6 +29,14 @@ class Settings(BaseSettings):
     sources_file: str = "sources.yaml"
     prompts_dir: str = "prompts"
 
+    # Сбор и ранжирование
+    freshness_hours: int = 72  # кандидаты старше окна не берём
+    fetch_full_text: bool = True  # добирать полный текст статьи по ссылке
+    rank_model: str = "claude-haiku-4-5"
+    rank_concurrency: int = 4  # параллельных запросов к модели
+    rank_min_relevance: int = 60  # ниже порога кандидат остаётся в базе, но не идёт дальше
+    digest_top_n: int = 3  # сколько черновиков показывать редактору
+
     log_level: str = "INFO"
 
     @field_validator("editor_ids", mode="before")
