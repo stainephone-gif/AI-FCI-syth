@@ -111,6 +111,8 @@ def setup_logging(level: str) -> None:
     )
     # Токен бота попадает в URL запросов aiogram; на DEBUG его лучше не светить.
     logging.getLogger("aiogram.event").setLevel(logging.INFO)
+    # Строка на каждый HTTP-запрос только мешает читать отчёт.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def load_settings() -> Settings:

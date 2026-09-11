@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from gigachat import GigaChat
+from gigachat.exceptions import RateLimitError
 from gigachat.models import Chat, Messages, MessagesRole
 from pydantic import BaseModel
 
@@ -38,11 +40,16 @@ class GigaChatProvider:
             scope=settings.gigachat_scope,
             verify_ssl_certs=settings.gigachat_verify_ssl,
             timeout=120,
+            # 429 приходит сразу при втором параллельном запросе; SDK ждёт и повторяет сам.
+            max_retries=6,
+            retry_backoff_factor=1.5,
         )
         if settings.gigachat_ca_bundle:
             kwargs["ca_bundle_file"] = settings.gigachat_ca_bundle
         self.client = GigaChat(**kwargs)
-        self.schema_mode = True  # выключается после первого сбоя achat_parse
+        self.schema_mode = True  # выключается, если модель не поддерживает response_format
+        # Тариф пропускает один запрос за раз, поэтому все вызовы идут по очереди.
+        self._lock = asyncio.Semaphore(1)
 
     def _messages(self, msgs: list[dict[str, str]]) -> list[Messages]:
         return [Messages(role=_ROLES[m["role"]], content=m["content"]) for m in msgs]
@@ -59,11 +66,14 @@ class GigaChatProvider:
         msgs = [{"role": "system", "content": system}, {"role": "user", "content": user}]
         if self.schema_mode:
             try:
-                _, parsed = await self.client.achat_parse(
-                    Chat(model=model, messages=self._messages(msgs), temperature=0.3),
-                    response_format=schema,
-                )
+                async with self._lock:
+                    _, parsed = await self.client.achat_parse(
+                        Chat(model=model, messages=self._messages(msgs), temperature=0.3),
+                        response_format=schema,
+                    )
                 return parsed
+            except RateLimitError:
+                raise  # лимит, а не формат: режим не меняем, ошибка уйдёт наверх
             except Exception as exc:  # noqa: BLE001 - бета-режим SDK, переходим на обычный JSON
                 log.warning("GigaChat achat_parse не сработал (%s), дальше обычный JSON", exc)
                 self.schema_mode = False
